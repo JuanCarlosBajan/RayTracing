@@ -1,11 +1,16 @@
 import struct
 from collections import namedtuple
+from tkinter.messagebox import NO
 import numpy as np
-
+from figures import *
+from lights import *
 from math import cos, sin, tan, pi
 from mathJCB import dot, escalarVectorMultiplication, normalized, toggleSign, vectorAddition
 
 from obj import Obj
+
+STEPS = 1
+MAX_RECURSION_DEPTH = 3
 
 V2 = namedtuple('Point2', ['x', 'y'])
 V3 = namedtuple('Point3', ['x', 'y', 'z'])
@@ -59,6 +64,7 @@ class Raytracer(object):
         self.scene = [ ]
         self.lights = [ ]
 
+        self.envMap = None
 
         self.clearColor = color(0,0,0)
         self.currColor = color(1,1,1)
@@ -82,9 +88,6 @@ class Raytracer(object):
     def glClear(self):
         self.pixels = [[ self.clearColor for y in range(self.height)]
                          for x in range(self.width)]
-
-
-
 
     def glClearViewport(self, clr = None):
         for x in range(self.vpX, self.vpX + self.vpWidth):
@@ -110,50 +113,70 @@ class Raytracer(object):
 
         return intersect
 
-    def cast_ray(self, orig, dir):
-        intersect = self.scene_intersect(orig, dir, None)
+    def cast_ray(self, orig, dir, sceneObj = None, recursion = 0):
+        intersect = self.scene_intersect(orig, dir, sceneObj)
 
-        if intersect == None:
-            return None
+        if intersect == None or recursion >= MAX_RECURSION_DEPTH:
+            if self.envMap:
+                return self.envMap.getEnvColor(dir)
+            else:
+                return (self.clearColor[0] / 255,
+                        self.clearColor[1] / 255,
+                        self.clearColor[2] / 255)
 
         material = intersect.sceneObj.material
 
-        finalColor = [0,0,0]
-        objectColor = [material.diffuse[0],
+        finalColor = np.array([0,0,0])
+        objectColor = np.array([material.diffuse[0],
                                 material.diffuse[1],
-                                material.diffuse[2]]
+                                material.diffuse[2]])
 
-        dirLightColor = [0,0,0]
-        ambLightColor = [0,0,0]
+        if material.matType == OPAQUE:
+            for light in self.lights:
+                diffuseColor = light.getDiffuseColor(intersect, self)
+                specColor = light.getSpecColor(intersect, self)
+                shadowIntensity = light.getShadowIntensity(intersect, self)
 
+                lightColor = (diffuseColor + specColor) * (1 - shadowIntensity)
 
-        for light in self.lights:
-            if light.lightType == 0: # directional light
-                diffuseColor = [0,0,0]
+                finalColor = np.add(finalColor, lightColor)
 
-                #print(light.lightType)
+        elif material.matType == REFLECTIVE:
+            reflect = reflectVector(intersect.normal, np.array(dir) * -1)
+            reflectColor = self.cast_ray(intersect.point, reflect, intersect.sceneObj, recursion + 1)
+            reflectColor = np.array(reflectColor)
 
-                light_dir = toggleSign(light.direction)
-                intensity = dot(intersect.normal, light_dir)
-                intensity = float(max(0, intensity))
+            specColor = np.array([0,0,0])
+            for light in self.lights:
+                specColor = np.add(specColor, light.getSpecColor(intersect, self))
 
-                diffuseColor = [intensity * light.color[0] * light.intensity,
-                                         intensity * light.color[1] * light.intensity,
-                                         intensity * light.color[2] * light.intensity]
+            finalColor = reflectColor + specColor
 
-                #Shadows
-                shadow_intensity = 0
-                shadow_intersect = self.scene_intersect(intersect.point, light_dir, intersect.sceneObj)
-                if shadow_intersect:
-                    shadow_intensity = 1
-                dirLightColor = vectorAddition(dirLightColor, escalarVectorMultiplication (1 - shadow_intensity,diffuseColor))
+        elif material.matType == TRANSPARENT:
+            outside = np.dot(dir, intersect.normal) < 0
+            bias = intersect.normal * 0.001
 
-            elif light.lightType == 2: # ambient light
-                ambLightColor = escalarVectorMultiplication(light.intensity,light.color) 
+            specColor = np.array([0,0,0])
+            for light in self.lights:
+                specColor = np.add(specColor, light.getSpecColor(intersect, self))
 
-        finalColor = vectorAddition(dirLightColor, ambLightColor)
+            reflect = reflectVector(intersect.normal, np.array(dir) * -1)
+            reflectOrig = np.add(intersect.point, bias) if outside else np.subtract(intersect.point, bias)
+            reflectColor = self.cast_ray(reflectOrig, reflect, None, recursion + 1)
+            reflectColor = np.array(reflectColor)
 
-        finalColor = [a*b for a, b in zip(finalColor, objectColor)]
+            kr = fresnel(intersect.normal, dir, material.ior)
+
+            refractColor = np.array([0,0,0])
+            if kr < 1:
+                refract = refractVector(intersect.normal, dir, material.ior)
+                refractOrig = np.subtract(intersect.point, bias) if outside else np.add(intersect.point, bias)
+                refractColor = self.cast_ray(refractOrig, refract, None, recursion + 1)
+                refractColor = np.array(refractColor)
+
+            finalColor = reflectColor * kr + refractColor * (1-kr)
+
+        finalColor *= objectColor
 
         r = min(1, finalColor[0])
         g = min(1, finalColor[1])
@@ -162,35 +185,29 @@ class Raytracer(object):
         return (r,g,b)
 
 
-
-
     def glRender(self):
-        for y in range(self.vpY, self.vpY + self.vpHeight + 1):
-            for x in range(self.vpX, self.vpX + self.vpWidth + 1):
+        # Proyeccion
+        t = tan((self.fov * np.pi / 180) / 2) * self.nearPlane
+        r = t * self.vpWidth / self.vpHeight
+
+        for y in range(self.vpY, self.vpY + self.vpHeight + 1, STEPS):
+            for x in range(self.vpX, self.vpX + self.vpWidth + 1, STEPS):
                 # Pasar de coordenadas de ventana a
                 # coordenadas NDC (-1 a 1)
                 Px = ((x + 0.5 - self.vpX) / self.vpWidth) * 2 - 1
                 Py = ((y + 0.5 - self.vpY) / self.vpHeight) * 2 - 1
 
-                # Proyeccion
-                t = tan((self.fov * np.pi / 180) / 2) * self.nearPlane
-                r = t * self.vpWidth / self.vpHeight
-
                 Px *= r
                 Py *= t
 
                 direction = V3(Px, Py, -self.nearPlane)
-                direction = normalized(direction)
+                direction = direction / np.linalg.norm(direction)
 
                 rayColor = self.cast_ray(self.camPosition, direction)
 
                 if rayColor is not None:
                     rayColor = color(rayColor[0],rayColor[1],rayColor[2])
                     self.glPoint(x, y, rayColor)
-
-
-
-
 
     def glFinish(self, filename):
         with open(filename, "wb") as file:
