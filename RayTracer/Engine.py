@@ -4,8 +4,8 @@ from figures import *
 from lights import *
 
 
-width = 1540
-height = 1540
+width = 1024
+height = 1024
 
 # Materiales
 
@@ -16,8 +16,8 @@ mirror = Material(diffuse = (0.9, 0.9, 0.9), spec = 64, matType = REFLECTIVE)
 blueMirror = Material(diffuse = (0.2, 0.2, 0.9), spec = 64, matType = REFLECTIVE)
 yellowMirror = Material(diffuse = (0.9, 0.9, 0.2), spec = 64, matType = REFLECTIVE)
 
-glass = Material (diffuse = (0.9, 0.9,0.9), spec=100, ior=2.4, matType=TRANSPARENT)
-purpleGlass = Material (diffuse = (0.9, 0.6,0.9), spec=100, ior=2.4, matType=TRANSPARENT)
+glass = Material (diffuse = (0.9, 0.9,0.9), spec=100, ior=1.325, matType=TRANSPARENT)
+purpleGlass = Material (diffuse = (0.9, 0.6,0.9), spec=100, ior=1.325, matType=TRANSPARENT)
 
 rtx = Raytracer(width, height)
 
