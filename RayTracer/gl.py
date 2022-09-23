@@ -1,11 +1,10 @@
 import struct
 from collections import namedtuple
-from tkinter.messagebox import NO
 import numpy as np
 from figures import *
 from lights import *
 from math import cos, sin, tan, pi
-from mathJCB import dot, escalarVectorMultiplication, normalized, toggleSign, vectorAddition
+from mathJCB import dot, escalarVectorMultiplication, normalized, toggleSign, vectorAddition, cross
 
 from obj import Obj
 
@@ -126,61 +125,58 @@ class Raytracer(object):
 
         material = intersect.sceneObj.material
 
-        finalColor = np.array([0,0,0])
-        objectColor = np.array([material.diffuse[0],
-                                material.diffuse[1],
-                                material.diffuse[2]])
+        finalColor = V3(0,0,0)
+        objectColor = V3(material.diffuse[0],
+                        material.diffuse[1],
+                        material.diffuse[2])
 
         if material.matType == OPAQUE:
             for light in self.lights:
                 diffuseColor = light.getDiffuseColor(intersect, self)
                 specColor = light.getSpecColor(intersect, self)
                 shadowIntensity = light.getShadowIntensity(intersect, self)
+                lightColor = escalarVectorMultiplication((1 - shadowIntensity), vectorAddition(diffuseColor, specColor))
 
-                lightColor = (diffuseColor + specColor) * (1 - shadowIntensity)
-
-                finalColor = np.add(finalColor, lightColor)
+                finalColor = vectorAddition(finalColor, lightColor)
 
         elif material.matType == REFLECTIVE:
-            reflect = reflectVector(intersect.normal, np.array(dir) * -1)
+            reflect = reflectVector(intersect.normal, toggleSign(dir))
             reflectColor = self.cast_ray(intersect.point, reflect, intersect.sceneObj, recursion + 1)
-            reflectColor = np.array(reflectColor)
+            reflectColor = reflectColor
 
-            specColor = np.array([0,0,0])
+            specColor = [0,0,0]
             for light in self.lights:
-                specColor = np.add(specColor, light.getSpecColor(intersect, self))
+                specColor = vectorAddition(specColor, light.getSpecColor(intersect, self))
 
-            finalColor = reflectColor + specColor
+            finalColor = vectorAddition(reflectColor, specColor)
 
         elif material.matType == TRANSPARENT:
-            outside = np.dot(dir, intersect.normal) < 0
-            bias = intersect.normal * 0.001
+            outside = dot(dir, intersect.normal) < 0
+            bias = escalarVectorMultiplication(0.001, intersect.normal)
 
-            specColor = np.array([0,0,0])
+            specColor = [0,0,0]
             for light in self.lights:
-                specColor = np.add(specColor, light.getSpecColor(intersect, self))
+                specColor = vectorAddition(specColor, light.getSpecColor(intersect, self))
 
-            reflect = reflectVector(intersect.normal, np.array(dir) * -1)
-            reflectOrig = np.add(intersect.point, bias) if outside else np.subtract(intersect.point, bias)
+            reflect = reflectVector(intersect.normal, toggleSign(dir))
+            reflectOrig = vectorAddition(intersect.point, bias) if outside else subtract(intersect.point, bias)
             reflectColor = self.cast_ray(reflectOrig, reflect, None, recursion + 1)
-            reflectColor = np.array(reflectColor)
 
             kr = fresnel(intersect.normal, dir, material.ior)
 
-            refractColor = np.array([0,0,0])
+            refractColor = [0,0,0]
             if kr < 1:
                 refract = refractVector(intersect.normal, dir, material.ior)
-                refractOrig = np.subtract(intersect.point, bias) if outside else np.add(intersect.point, bias)
+                refractOrig = subtract(intersect.point, bias) if outside else vectorAddition(intersect.point, bias)
                 refractColor = self.cast_ray(refractOrig, refract, None, recursion + 1)
-                refractColor = np.array(refractColor)
 
-            finalColor = reflectColor * kr + refractColor * (1-kr)
+            finalColor = vectorAddition(escalarVectorMultiplication(kr, reflectColor), escalarVectorMultiplication((1-kr), refractColor)) 
 
-        finalColor *= objectColor
+        finalColor = V3(objectColor.x * finalColor.x, objectColor.y * finalColor.y, objectColor.z * finalColor.z)
 
-        r = min(1, finalColor[0])
-        g = min(1, finalColor[1])
-        b = min(1, finalColor[2])
+        r = max(0, min(1, finalColor[0]))
+        g = max(0, min(1, finalColor[1]))
+        b = max(0, min(1, finalColor[2]))
 
         return (r,g,b)
 
@@ -201,9 +197,10 @@ class Raytracer(object):
                 Py *= t
 
                 direction = V3(Px, Py, -self.nearPlane)
-                direction = direction / np.linalg.norm(direction)
+                direction = normalized(direction)
 
                 rayColor = self.cast_ray(self.camPosition, direction)
+                #print(rayColor)
 
                 if rayColor is not None:
                     rayColor = color(rayColor[0],rayColor[1],rayColor[2])

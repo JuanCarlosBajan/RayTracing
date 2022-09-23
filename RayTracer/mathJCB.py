@@ -46,6 +46,7 @@ def normalized (X):
         x = X.x / m
         y = X.y / m
         z = X.z / m
+        #print(sqrt( X.x**2 + X.y**2 + X.z**2 ), x, y, z)
         return V3((x.real),(y.real),(z.real))
     except:
         return
