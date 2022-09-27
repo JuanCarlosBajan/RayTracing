@@ -174,6 +174,10 @@ class Raytracer(object):
 
         finalColor = V3(objectColor.x * finalColor.x, objectColor.y * finalColor.y, objectColor.z * finalColor.z)
 
+        if material.texture and intersect.texcoords:
+            texColor = material.texture.getColor(intersect.texcoords[0], intersect.texcoords[1])
+            finalColor *= np.array(texColor)
+
         r = max(0, min(1, finalColor[0]))
         g = max(0, min(1, finalColor[1]))
         b = max(0, min(1, finalColor[2]))

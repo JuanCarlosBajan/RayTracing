@@ -10,17 +10,19 @@ REFLECTIVE = 1
 TRANSPARENT = 2
 
 class Intersect(object):
-    def __init__(self, distance, point, normal, sceneObj):
+    def __init__(self, distance, point, normal,texcoords, sceneObj):
         self.distance = distance
         self.point = point
         self.normal = normal
+        self.texcoords = texcoords
         self.sceneObj = sceneObj
 
 class Material(object):
-    def __init__(self, diffuse = WHITE, spec = 1.0,ior = 1.0, matType = OPAQUE):
+    def __init__(self, diffuse = WHITE, spec = 1.0,ior = 1.0, texture = None, matType = OPAQUE):
         self.diffuse = diffuse
         self.spec = spec
         self.ior = ior
+        self.texture = texture
         self.matType = matType
 
 class Sphere(object):
@@ -52,7 +54,13 @@ class Sphere(object):
         normal = subtract(P, self.center)
         normal = normalized(normal)
 
+        u = 1 - ((np.arctan2(normal[2], normal[0]) / (2 * np.pi)) + 0.5)
+        v = np.arccos(-normal[1]) / np.pi
+
+        uvs = (u,v)
+
         return Intersect(distance = t0,
                          point = P,
                          normal = normal,
+                         texcoords= uvs,
                          sceneObj = self)
