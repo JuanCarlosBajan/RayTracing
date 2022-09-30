@@ -101,9 +101,8 @@ class Raytracer(object):
     def scene_intersect(self, orig, dir, sceneObj):
         depth = float('inf')
         intersect = None
-
         for obj in self.scene:
-            hit = obj.ray_intersect(orig, dir)
+            hit = obj.ray_intersect(orig = orig,dir = dir)
             if hit != None:
                 if sceneObj != hit.sceneObj:
                     if hit.distance < depth:
@@ -176,7 +175,8 @@ class Raytracer(object):
 
         if material.texture and intersect.texcoords:
             texColor = material.texture.getColor(intersect.texcoords[0], intersect.texcoords[1])
-            finalColor *= np.array(texColor)
+            if texColor is not None:
+                finalColor *= np.array(texColor)
 
         r = max(0, min(1, finalColor[0]))
         g = max(0, min(1, finalColor[1]))

@@ -1,6 +1,8 @@
 import numpy as np
-
+from collections import namedtuple
 from mathJCB import dot, escalarVectorMultiplication, magnitude, normalized, subtract, vectorAddition
+
+V3 = namedtuple('Point3', ['x', 'y', 'z'])
 
 WHITE = (1,1,1)
 BLACK = (0,0,0)
@@ -24,6 +26,30 @@ class Material(object):
         self.ior = ior
         self.texture = texture
         self.matType = matType
+
+class Plane(object):
+    def __init__(self, position, normal, material):
+        self.position = position
+        self.normal = normalized(normal)
+        self.material = material
+
+    def ray_intersect(self, orig, dir):
+        denom = dot(dir, self.normal)
+
+        if abs(denom) > 0.001:
+            
+            num = dot(subtract(self.position, orig), self.normal)
+            t = num/denom
+
+            if t > 0:
+                p = vectorAddition(orig, escalarVectorMultiplication(t, dir))
+                return Intersect(distance=t,
+                                    point=p,
+                                    normal=self.normal,
+                                    texcoords=None,
+                                    sceneObj=self)
+
+        return None
 
 class Sphere(object):
     def __init__(self, center, radius, material):
@@ -64,3 +90,102 @@ class Sphere(object):
                          normal = normal,
                          texcoords= uvs,
                          sceneObj = self)
+
+class Disk(object):
+    def __init__(self, position, radius, normal, material):
+        self.plane = Plane(position, normal, material)
+        self.radius = radius
+    
+    def ray_intersect(self, orig, dir):
+
+        intersect = self.plane.ray_intersect(orig, dir)
+
+        if intersect is None:
+            return None
+        
+        contactDistance = subtract(intersect.point, self.plane.position)
+        contact = normalized(contactDistance)
+        if contact <= self.radius:
+            return None
+        
+        return Intersect(distance=intersect.distance,
+                        point=intersect.point,
+                        normal = self.plane.normal,
+                        texcoords= None,
+                        sceneObj=self)
+
+
+class AABB(object):
+    def __init__(self, size, position, material):
+        self.size = size
+        self.position = position
+        self.material = material
+    
+        self.planes = []
+
+        halfSizes = [0,0,0]
+        halfSizes[0] = size[0] / 2
+        halfSizes[1] = size[1] / 2
+        halfSizes[2] = size[2] / 2
+
+        self.planes.append(Plane(vectorAddition(position, V3(halfSizes[0], 0, 0)), V3(1,0,0), material))
+        self.planes.append(Plane(vectorAddition(position, V3(-halfSizes[0], 0, 0)), V3(-1,0,0), material))
+
+
+        self.planes.append(Plane(vectorAddition(position, V3(0, halfSizes[1], 0)), V3(0,1,0), material))
+        self.planes.append(Plane(vectorAddition(position, V3(0, -halfSizes[1], 0)), V3(0,-1,0), material))
+
+        self.planes.append(Plane(vectorAddition(position, V3(0, 0, halfSizes[2])), V3(0,0,1), material))
+        self.planes.append(Plane(vectorAddition(position, V3(0, 0, -halfSizes[2])), V3(0,0,-1), material))
+
+        self.boundMin = [0,0,0]
+        self.boundMax = [0,0,0]
+
+        epsilon = 0.001
+
+        for i in range(3):
+            self.boundMin[i] = self.position[i] - (epsilon + halfSizes[i])
+            self.boundMax[i] = self.position[i] + (epsilon + halfSizes[i])
+
+    def ray_intersect(self, orig, dir):
+        intersect = None
+        t = float('inf')
+
+        for plane in self.planes:
+            planeInter = plane.ray_intersect(orig, dir)
+            if planeInter is not None:
+                planePoint = planeInter.point
+                if self.boundMin[0] <= planePoint[0] <= self.boundMax[0]:
+                    if self.boundMin[1] <= planePoint[1] <= self.boundMax[1]:
+                        if self.boundMin[2] <= planePoint[2] <= self.boundMax[2]:
+                            if planeInter.distance < t:
+                                t = planeInter.distance
+                                intersect = planeInter
+
+
+                                u,v = 0,0
+
+                                if abs(plane.normal[0] > 0):
+                                    u = (planeInter.point[1] - self.boundMin[1]) / (self.boundMax[1] - self.boundMin[1])
+                                    v = (planeInter.point[2] - self.boundMin[2]) / (self.boundMax[2] - self.boundMin[2])
+
+                                if abs(plane.normal[1] > 0):
+                                    u = (planeInter.point[0] - self.boundMin[0]) / (self.boundMax[0] - self.boundMin[0])
+                                    v = (planeInter.point[2] - self.boundMin[2]) / (self.boundMax[2] - self.boundMin[2])
+                                
+                                if abs(plane.normal[2] > 0):
+                                    u = (planeInter.point[0] - self.boundMin[0]) / (self.boundMax[0] - self.boundMin[0])
+                                    v = (planeInter.point[1] - self.boundMin[1]) / (self.boundMax[1] - self.boundMin[1])
+
+        
+        if intersect is None:
+            return None
+        
+        return Intersect(distance=t,
+                            point=intersect.point,
+                            normal=intersect.normal,
+                            texcoords=(u,v),
+                            sceneObj=self)
+
+
+    
