@@ -57,27 +57,28 @@ class Triangle(object):
         self.b = b
         self.c = c
         self.material = material
+        self.center = V3((a.x+b.x+c.x)/3,(a.y+b.y+c.y)/3,(a.z+b.z+c.z)/3)
 
     def ray_intersect(self, orig, dir):
 
         self.normal = normalized(cross(subtract(self.b, self.a), subtract(self.c,self.a) ))
-        self.normal = toggleSign(self.normal)
+        #self.normal = toggleSign(self.normal)
 
 
         denom = dot(dir, self.normal)
 
         if abs(denom) > 0.001:
-            num = dot( dir,self.normal)
+            num = dot(subtract(self.center, orig), self.normal)
             t = num/denom
 
             if t > 0:
                 p = vectorAddition(orig, escalarVectorMultiplication(t, dir))
-                sa = dot(self.normal, cross(subtract(self.b,self.a),subtract(p,self.a)))
-                sb = dot(self.normal, cross(subtract(self.c,self.b),subtract(p,self.b)))
-                sc = dot(self.normal, cross(subtract(self.a,self.c),subtract(p,self.c)))
+                sa = dot(cross(subtract(self.b,self.a),subtract(p,self.a)), self.normal)
+                sb = dot(cross(subtract(self.c,self.b),subtract(p,self.b)), self.normal)
+                sc = dot(cross(subtract(self.a,self.c),subtract(p,self.c)), self.normal)
                 if sa <= 0 or sb <= 0 or sc <= 0:
                     return None
-                print(sa,sb,sc)
+                #print(p)
                 return Intersect(distance=t,
                                     point=p,
                                     normal=self.normal,
