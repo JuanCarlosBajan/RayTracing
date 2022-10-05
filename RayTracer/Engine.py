@@ -4,8 +4,8 @@ from figures import *
 from lights import *
 
 
-width = 1024
-height = 1024
+width = 504
+height = 504
 
 # Materiales
 
@@ -27,13 +27,7 @@ rtx.lights.append( AmbientLight(intensity = 0.1 ))
 rtx.lights.append( DirectionalLight(direction = (-1,-1,-1), intensity = 0.8 ))
 #rtx.lights.append( PointLight(point = (0,0,0)))
 
-rtx.scene.append( Sphere(V3(-2,0,-15), 1, brick)  )
-rtx.scene.append( Sphere(V3(2,0,-15), 1, stone)  )
-rtx.scene.append( Sphere(V3(-2,2,-15), 1, mirror)  )
-rtx.scene.append( Sphere(V3(2,2,-15), 1, blueMirror)  )
-rtx.scene.append( Sphere(V3(0,0,-10), 1, glass)  )
-rtx.scene.append( Sphere(V3(0,-2,-10), 1, purpleGlass)  )
-
+rtx.scene.append( Triangle(a= V3(-2,0,-5), b=V3(1,2,-5), c=V3(-1, 5, -5), material= brick)  )
 
 rtx.glRender()
 
