@@ -1,5 +1,6 @@
 import numpy as np
 from collections import namedtuple
+from RayTracer.mathJCB import cross
 from mathJCB import dot, escalarVectorMultiplication, magnitude, normalized, subtract, vectorAddition
 
 V3 = namedtuple('Point3', ['x', 'y', 'z'])
@@ -43,6 +44,40 @@ class Plane(object):
 
             if t > 0:
                 p = vectorAddition(orig, escalarVectorMultiplication(t, dir))
+                return Intersect(distance=t,
+                                    point=p,
+                                    normal=self.normal,
+                                    texcoords=None,
+                                    sceneObj=self)
+
+        return None
+
+class Triangle(object):
+    def __init__(self, a, b, c, material):
+        self.a = a
+        self.b = b
+        self.c = c
+        self.material = material
+
+    def ray_intersect(self, orig, dir):
+
+        self.normal = normalized(cross(subtract(self.b, self.a), subtract(self.c,self.a) ))
+        
+        denom = dot(dir, self.normal)
+
+        if abs(denom) > 0.001:
+            num = dot(subtract(self.position, orig), self.normal)
+            t = num/denom
+
+            if t > 0:
+                p = vectorAddition(orig, escalarVectorMultiplication(t, dir))
+                sa = dot(self.normal, cross(subtract(self.b,self.a),subtract(p,self.a)))
+                sb = dot(self.normal, cross(subtract(self.c,self.b),subtract(p,self.b)))
+                sc = dot(self.normal, cross(subtract(self.a,self.c),subtract(p,self.c)))
+
+                if sa == 0 or sb == 0 or sc == 0:
+                    return None
+
                 return Intersect(distance=t,
                                     point=p,
                                     normal=self.normal,
