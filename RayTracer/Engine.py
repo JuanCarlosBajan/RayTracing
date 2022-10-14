@@ -4,8 +4,8 @@ from figures import *
 from lights import *
 
 
-width = 504
-height = 504
+width = 60
+height = 60
 
 # Materiales
 
@@ -27,9 +27,11 @@ rtx.lights.append( AmbientLight(intensity = 0.1 ))
 rtx.lights.append( DirectionalLight(direction = (-1,-1,-1), intensity = 0.8 ))
 #rtx.lights.append( PointLight(point = (0,0,0)))
 
-rtx.scene.append( Triangle(a= V3(-2,-1,-3-10), b=V3(1,-1,-2-10), c=V3(-1, 2, -3-10), material= blueMirror)  )
-rtx.scene.append( Triangle(a= V3(-3,-1,-3-10), b=V3(4,-3,-2-10), c=V3(-1, 4, -3-10), material= purpleGlass)  )
-rtx.scene.append( Triangle(a= V3(-5,-3,-10), b=V3(-5,2,-10), c=V3(-1, 4, -3-10), material= brick)  )
+rtx.glLoadModel("RayTracer/Models&Outputs/face.obj",
+                material = brick,
+                translate = V3(0, 0, -35),
+                scale = V3(1,1,1),
+                rotate = V3(0,0,0))
 
 rtx.glRender()
 

@@ -4,7 +4,7 @@ import numpy as np
 from figures import *
 from lights import *
 from math import cos, sin, tan, pi
-from mathJCB import dot, escalarVectorMultiplication, normalized, toggleSign, vectorAddition, cross
+from mathJCB import dot, escalarVectorMultiplication, normalized, toggleSign, vectorAddition, cross, vector_matrix_multiplication, matrix_multiplication, getMatrixInverse
 
 from obj import Obj
 
@@ -63,6 +63,9 @@ class Raytracer(object):
         self.scene = [ ]
         self.lights = [ ]
 
+        self.glViewMatrix()
+        
+
         self.envMap = None
 
         self.clearColor = color(0,0,0)
@@ -77,6 +80,66 @@ class Raytracer(object):
         self.vpY = posY
         self.vpWidth = width
         self.vpHeight = height
+
+        self.viewportMatrix =  [[width/2,0,0,posX+width/2],
+                                [0,height/2,0,posY+height/2],
+                                [0,0,0.5,0.5],
+                                [0,0,0,1]]
+
+        self.glProjectionMatrix()
+    
+    def glProjectionMatrix(self, n = 0.1, f = 1000, fov = 60):
+        aspectRatio = self.vpWidth / self.vpHeight
+        t = tan( (fov * pi / 180) / 2) * n
+        r = t * aspectRatio
+
+        self.projectionMatrix =    [[n/r,0,0,0],
+                                    [0,n/t,0,0],
+                                    [0,0,-(f+n)/(f-n),-(2*f*n)/(f-n)],
+                                    [0,0,-1,0]]
+    
+    def glViewMatrix(self, translate = V3(0,0,0), rotate = V3(0,0,0)):
+        self.camMatrix = self.glCreateObjectMatrix(translate, rotate)
+        self.viewMatrix = getMatrixInverse(self.camMatrix)
+    
+    def glCreateRotationMatrix(self, pitch = 0, yaw = 0, roll = 0):
+        
+        pitch *= pi/180
+        yaw   *= pi/180
+        roll  *= pi/180
+
+        pitchMat = [[1, 0, 0, 0],
+                    [0, cos(pitch),-sin(pitch), 0],
+                    [0, sin(pitch), cos(pitch), 0],
+                    [0, 0, 0, 1]]
+
+        yawMat =   [[cos(yaw), 0, sin(yaw), 0],
+                    [0, 1, 0, 0],
+                    [-sin(yaw), 0, cos(yaw), 0],
+                    [0, 0, 0, 1]]
+
+        rollMat =  [[cos(roll),-sin(roll), 0, 0],
+                    [sin(roll), cos(roll), 0, 0],
+                    [0, 0, 1, 0],
+                    [0, 0, 0, 1]]
+
+        return  matrix_multiplication(pitchMat, matrix_multiplication(yawMat, rollMat))
+
+    def glCreateObjectMatrix(self, translate = V3(0,0,0), rotate = V3(0,0,0), scale = V3(1,1,1)):
+
+        translation =  [[1, 0, 0, translate.x],
+                        [0, 1, 0, translate.y],
+                        [0, 0, 1, translate.z],
+                        [0, 0, 0, 1]]
+
+        rotation = self.glCreateRotationMatrix(rotate.x, rotate.y, rotate.z)
+
+        scaleMat = [[scale.x, 0, 0, 0],
+                    [0, scale.y, 0, 0],
+                    [0, 0, scale.z, 0],
+                    [0, 0, 0, 1]]
+
+        return matrix_multiplication(translation, matrix_multiplication(rotation, scaleMat))
 
     def glClearColor(self, r, g, b):
         self.clearColor = color(r,g,b)
@@ -187,6 +250,7 @@ class Raytracer(object):
 
     def glRender(self):
         # Proyeccion
+
         t = tan((self.fov * np.pi / 180) / 2) * self.nearPlane
         r = t * self.vpWidth / self.vpHeight
 
@@ -204,11 +268,83 @@ class Raytracer(object):
                 direction = normalized(direction)
 
                 rayColor = self.cast_ray(self.camPosition, direction)
-                #print(rayColor)
 
                 if rayColor is not None:
                     rayColor = color(rayColor[0],rayColor[1],rayColor[2])
                     self.glPoint(x, y, rayColor)
+
+    def glCreateRotationMatrix(self, pitch = 0, yaw = 0, roll = 0):
+        
+        pitch *= pi/180
+        yaw   *= pi/180
+        roll  *= pi/180
+
+        pitchMat = [[1, 0, 0, 0],
+                    [0, cos(pitch),-sin(pitch), 0],
+                    [0, sin(pitch), cos(pitch), 0],
+                    [0, 0, 0, 1]]
+
+        yawMat =   [[cos(yaw), 0, sin(yaw), 0],
+                    [0, 1, 0, 0],
+                    [-sin(yaw), 0, cos(yaw), 0],
+                    [0, 0, 0, 1]]
+
+        rollMat =  [[cos(roll),-sin(roll), 0, 0],
+                    [sin(roll), cos(roll), 0, 0],
+                    [0, 0, 1, 0],
+                    [0, 0, 0, 1]]
+
+        return  matrix_multiplication(pitchMat, matrix_multiplication(yawMat, rollMat))
+
+
+    def glCreateObjectMatrix(self, translate = V3(0,0,0), rotate = V3(0,0,0), scale = V3(1,1,1)):
+
+        translation =  [[1, 0, 0, translate.x],
+                        [0, 1, 0, translate.y],
+                        [0, 0, 1, translate.z],
+                        [0, 0, 0, 1]]
+
+        rotation = self.glCreateRotationMatrix(rotate.x, rotate.y, rotate.z)
+
+        scaleMat = [[scale.x, 0, 0, 0],
+                    [0, scale.y, 0, 0],
+                    [0, 0, scale.z, 0],
+                    [0, 0, 0, 1]]
+
+        return matrix_multiplication(translation, matrix_multiplication(rotation, scaleMat))
+
+    def glTransform(self, vertex, matrix):
+        v = V4(vertex[0], vertex[1], vertex[2], 1)
+        vt = vector_matrix_multiplication(matrix, v)
+        vf = V3(vt[0] / vt[3],
+                vt[1] / vt[3],
+                vt[2] / vt[3])
+
+        return vf
+
+    def glLoadModel(self, filename, material, translate = V3(0,0,0), rotate = V3(0,0,0), scale = V3(1,1,1)):
+        model = Obj(filename)
+        modelMatrix = self.glCreateObjectMatrix(translate, rotate, scale)
+
+
+        for face in model.faces:
+            vertCount = len(face)
+
+            v0 = model.vertices[ face[0][0] - 1]
+            v1 = model.vertices[ face[1][0] - 1]
+            v2 = model.vertices[ face[2][0] - 1]
+
+            v0 = self.glTransform(v0, modelMatrix)
+            v1 = self.glTransform(v1, modelMatrix)
+            v2 = self.glTransform(v2, modelMatrix)
+
+            self.scene.append(Triangle(v0, v1, v2, material))
+
+            if vertCount == 4:
+                v3 = model.vertices[ face[3][0] - 1]
+                v3 = self.glTransform(v3, modelMatrix)
+
+                self.scene.append(Triangle(v0, v2, v3, material))
 
     def glFinish(self, filename):
         with open(filename, "wb") as file:

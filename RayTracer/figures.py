@@ -58,6 +58,7 @@ class Triangle(object):
         self.c = c
         self.material = material
         self.center = V3((a.x+b.x+c.x)/3,(a.y+b.y+c.y)/3,(a.z+b.z+c.z)/3)
+        print(a,b,c)
 
     def ray_intersect(self, orig, dir):
 
